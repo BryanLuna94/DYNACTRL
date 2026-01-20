@@ -1,0 +1,50 @@
+name: Deploy DEV - IIS (.NET 8)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore
+      run: dotnet restore ./test.csproj
+
+    - name: Build
+      run: dotnet build ./test.csproj -c Release --no-restore
+
+    - name: Stop IIS App Pool
+      run: |
+        Import-Module WebAdministration
+        if ((Get-WebAppPoolState "PoolDevGyT").Value -ne "Stopped") {
+          Stop-WebAppPool "PoolDevGyT"
+        }
+
+    - name: Clean IIS folder
+      run: |
+        if (Test-Path "F:\iedweb\api\gradostitulos") {
+          Remove-Item "F:\iedweb\api\gradostitulos\*" -Recurse -Force
+        }
+
+    - name: Publish to IIS folder
+      run: |
+        dotnet publish ./gradostitulos/gradostitulos.csproj `
+          -c Release `
+          -o F:\iedweb\api\gradostitulos `
+          --no-build
+
+    - name: Start IIS App Pool
+      run: |
+        Import-Module WebAdministration
+        Start-WebAppPool "PoolDevGyT"
